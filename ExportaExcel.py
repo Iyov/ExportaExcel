@@ -286,7 +286,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         EfactCNE = pandas.read_sql(QueryEfact, engine)
 
 
-        EfactCNE_BT = pandas.read_sql(f"""
+        QueryEfactCNE_BT = f"""
             SELECT	c.IdContrato,
                     CONVERT(VARCHAR(100), c.Fecha, 105) AS MesDevengado,
                     c.Anho,
@@ -362,7 +362,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             ORDER BY Fecha,
                     CodigoContrato,
                     PuntoRetiro
-        """, engine)
+        """
+        # if(Debug): print(QueryEfactCNE_BT)
+        EfactCNE_BT = pandas.read_sql(QueryEfactCNE_BT, engine)
 
         
         QuerySigge = f"""
@@ -781,7 +783,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
             if( Debug ):
                 Agrupador = "'VENTA PPA ENERGIA', 'VENTA PPA POTENCIA'"
-                # print( QueryReal.replace("|Agrupador|", Agrupador) )
+                print( QueryReal.replace("|Agrupador|", Agrupador) )
             
             Agrupador = "'VENTA PPA ENERGIA'"
             FactReal_E = pandas.read_sql(QueryReal.replace("|Agrupador|", Agrupador), engine)
@@ -796,25 +798,27 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         TemplateRM.to_excel(writer, sheet_name='README', index=False)
         # if( IdCliente == 1 ):
         #     Mapa_Data_SQL.to_excel(writer, sheet_name='MAPA_DATA', index=False)
-        TemplateRE.to_excel(writer, sheet_name='ReliquidacionEFACT', index=False)
         if( IdCliente == 1 ):
-                TemplateRC.to_excel(writer, sheet_name='ReliquidacionCEN', index=False)
+            TemplateRC.to_excel(writer, sheet_name='ReliquidacionCEN', index=False)
+        TemplateRE.to_excel(writer, sheet_name='ReliquidacionEFACT', index=False)
         TemplateRT.to_excel(writer, sheet_name='ResumenRetiros', index=False)
         
+        if( IdCliente == 1 ):
+            FactReal_E.to_excel(writer, sheet_name='FactRealE', index=False)
+            FactReal_P.to_excel(writer, sheet_name='FactRealP', index=False)
         SiggeFact.to_excel(writer, sheet_name='FACT_EMITIDA', index=False)
         SiggeFactE.to_excel(writer, sheet_name='SIGGE_E', index=False)
         SiggeFactP.to_excel(writer, sheet_name='SIGGE_P', index=False)
+        
         if( IdCliente == 1 ):
             FactEstimada.to_excel(writer, sheet_name='FACT_EST_EFACT', index=False)
-            FactReal_E.to_excel(writer, sheet_name='FactRealE', index=False)
-            FactReal_P.to_excel(writer, sheet_name='FactRealP', index=False)
         
+        EfactCNE.to_excel(writer, sheet_name='EFACT_CNE', index=False)
+        EfactCNE_BT.to_excel(writer, sheet_name='EfactCNE_BT', index=False)
+
         Coordinador_Energia.to_excel(writer, sheet_name='CEN_Energia', index=False) #Actualizar CEN
         Coordinador_Potencia.to_excel(writer, sheet_name='CEN_Potencia', index=False)
         CEN_EnergiaBT.to_excel(writer, sheet_name='CEN_EnergiaBT', index=False)
-
-        EfactCNE.to_excel(writer, sheet_name='EFACT_CNE', index=False)
-        EfactCNE_BT.to_excel(writer, sheet_name='EfactCNE_BT', index=False)
         
         TemplateS.to_excel(writer, sheet_name='EFACT_EST_CEN', index=False) #Actualizar CEN
         TemplateS.to_excel(writer, sheet_name='SIN_DATA', index=False)
@@ -984,11 +988,11 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         Hoja_EFACT = wbxl.sheets['ReliquidacionEFACT']
         ReliquidacionEFACT = Hoja_EFACT.range('AE66').value
 
-        Hoja_Reliquidacion = wbxl.sheets['ReliquidacionEFACT']
+        Hoja_Reliquidacion = wbxl.sheets['ReliquidacionCEN']
         
         ReliquidacionCEN = 0
         if( IdCliente == 1 ):
-            Hoja_CEN = wbxl.sheets['ReliquidacionEFACT']
+            Hoja_CEN = wbxl.sheets['ReliquidacionCEN']
             ReliquidacionCEN = Hoja_CEN.range('AE66').value
             print("ReliquidacionEFACT:", ReliquidacionEFACT, "| ReliquidacionCEN:", ReliquidacionCEN) #, "| Diferencia:", (ReliquidacionEFACT-ReliquidacionCEN))
         if( ReliquidacionCEN is None ):
@@ -1021,7 +1025,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         cursor2.close()
         conn2.close()
 
-        # Recorre la hoja ReliquidacionEFACT para generar resumen
+        # Recorre la hoja de Reliquidacion para generar resumen
         DF_GxBq = Hoja_Reliquidacion.range('B8:J65').options(pandas.Series, expand='table', index=0).value
         DF_GxBq = DF_GxBq.drop(DF_GxBq.columns[[1,2,3,4,5,6,7]], axis='columns')
         DF_GxBq = DF_GxBq.rename(columns={
