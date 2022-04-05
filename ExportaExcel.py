@@ -49,7 +49,7 @@ print( f"""Reliquidación de '{AbrevCliente}' desde {str(Desde)} al {str(Hasta)}
 
 #region Obtiene las Agrupaciones y los Contratos para recorrer
 #Son 30, es un SP => son 27 con datos, filtrar Ids 12, 19, 20
-ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion NOT IN (12, 19, 20)', engine) #NOT IN (12, 19, 20)
+ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion IN (6, 5, 28, 4)', engine) #NOT IN (12, 19, 20) 23,25,28
 
 #Son 8: Caren BS1 A, B, C, BS3; Norvind BS4; San Juan BS2A, 2C y 3
 ListaGxBloques = pandas.read_sql("SELECT * FROM dbo.CNE_GxBloque WHERE IdCliente = '" + AbrevCliente + "'", engine) # AND GX = ''
@@ -59,8 +59,8 @@ ListaGxBloques = pandas.read_sql("SELECT * FROM dbo.CNE_GxBloque WHERE IdCliente
 NomTemplate = "Template_" + AbrevCliente + ".xlsx"
 TemplateRM = pandas.read_excel(NomTemplate, sheet_name="README")
 TemplateRE = pandas.read_excel(NomTemplate, sheet_name="ReliquidacionEFACT")
-if( IdCliente == 1 ):
-        TemplateRC = pandas.read_excel(NomTemplate, sheet_name="ReliquidacionCEN")
+# if( IdCliente == 1 ):
+#     TemplateRC = pandas.read_excel(NomTemplate, sheet_name="ReliquidacionCEN")
 TemplateRT = pandas.read_excel(NomTemplate, sheet_name="ResumenRetiros")
 # TemplateD = pandas.read_excel(NomTemplate, sheet_name="MAPA_DATA")
 TemplateS = pandas.read_excel(NomTemplate, sheet_name="SIN_DATA")
@@ -68,11 +68,11 @@ TemplateI = pandas.read_excel(NomTemplate, sheet_name="INTERESES")
 #endregion
 
 for i, Agrupacion in ListaDeAgrup.iterrows():
+    #region Generacion de Excel consolidado por Agrupador
     IdAgrupacion = int(Agrupacion["IdAgrupacion"])
     NomAgrupacion = Agrupacion["NomAgrupacion"]
     print( IdAgrupacion, "|", NomAgrupacion )
 
-    #region Generacion de Excel consolidado por Agrupador
     ExcelConsolidado = f"""{IdAgrupacion}-{NomAgrupacion}.xlsx"""
     PDConsolidado = pandas.ExcelWriter(ExcelConsolidado, engine='xlsxwriter', date_format='d/m/yyyy')
     DF_Resumen = pandas.DataFrame()
@@ -80,6 +80,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
     #endregion
 
     for j, GxBloque in ListaGxBloques.iterrows():
+        #region Variables globales de cada contrato (Lic, Gx, Dx, Bloque)
         Licitacion = GxBloque["Licitacion"]
         Empresa = GxBloque["GX"]
         Bloque = GxBloque["Bloque"]
@@ -92,6 +93,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         NomExcel = f"""{Licitacion} {Empresa} {Bloque} {IdAgrupacion}-{NomAgrupacion}.xlsx"""
         writer = pandas.ExcelWriter(NomExcel, engine='xlsxwriter')
+        #endregion
 
         #region Ejecuta las Querys SQL y las convierte en DataFrames
 
@@ -245,7 +247,10 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 e.PRec_Peso * f.FactorAjustePotencia AS TotalPotenciaAjustado,
 
                 a.NomAgrupacion,
-                (e.ERec_USD * e.Dolar/1000.0) AS  PrecioEnergia,
+                CASE
+					WHEN e.EPC > 0 THEN (e.ERec_USD * e.Dolar/e.EPC)
+					ELSE 0
+				END AS  PrecioEnergia,
                 (e.ERec_USD * e.Dolar/1000.0) * f.FactorAjusteEnergia AS PrecioEnergiaAjustado,
                 e.ERec_Peso AS TotalEnergia,
 
@@ -281,7 +286,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 PuntoRetiro,
                 NomBarra
         """
-        if(Debug): print(QueryEfact)
+        # if(Debug): 
+        print(QueryEfact)
 
         EfactCNE = pandas.read_sql(QueryEfact, engine)
 
@@ -553,7 +559,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     e.Distribuidora,
                     e.Clave,
                     e.PuntoRetiro,
-                    e.Medida_kWh*-1 AS ConsumoEnergiaBT,
+                    (e.Medida_kWh*-1*e.Prorrata) AS ConsumoEnergiaBT,
+		            e.Prorrata,
+                    (e.Medida_kWh*-1) AS Medida_kWh,
                     e.PuntoRetiroBT,
                     e.Bloque,
                     e.Incremento
@@ -568,6 +576,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     AND e.Fecha BETWEEN CAST('{Desde}' AS DATETIME) AND CAST('{Hasta}' AS DATETIME)
             ORDER BY 2,5,6,9
         """
+        if(Debug): print(QueryCEN_EnergiaBT)
+        # ACL+FB+OM 2021-10-25: Se quita Energia en BT de las planillas ya que arroja error en SJ BS3 CRELL
         CEN_EnergiaBT = pandas.read_sql(QueryCEN_EnergiaBT, engine)
 
         QueryCoordinador_Potencia = f"""
@@ -654,7 +664,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         Coordinador_Potencia = pandas.read_sql(QueryCoordinador_Potencia, engine)
 
         if( IdCliente == 1 ):
-            FactEstimada = pandas.read_sql(f"""
+            QueryFactEstimada = f"""
                 SELECT	c.IdContrato,
                         CONVERT(VARCHAR(100), c.Fecha, 105) AS MesDevengado,
                         Anho,
@@ -738,7 +748,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         c.Fecha,
                         c.CodigoContrato,
                         NomBarra
-            """, engine)
+            """
+            # FactEstimada = pandas.read_sql(QueryFactEstimada, engine)
             
             QueryReal = f"""
                 SELECT	f.Empresa,
@@ -798,9 +809,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         TemplateRM.to_excel(writer, sheet_name='README', index=False)
         # if( IdCliente == 1 ):
         #     Mapa_Data_SQL.to_excel(writer, sheet_name='MAPA_DATA', index=False)
-        if( IdCliente == 1 ):
-            TemplateRC.to_excel(writer, sheet_name='ReliquidacionCEN', index=False)
         TemplateRE.to_excel(writer, sheet_name='ReliquidacionEFACT', index=False)
+        # if( IdCliente == 1 ):
+        #     TemplateRC.to_excel(writer, sheet_name='ReliquidacionCEN', index=False)
         TemplateRT.to_excel(writer, sheet_name='ResumenRetiros', index=False)
         
         if( IdCliente == 1 ):
@@ -810,8 +821,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         SiggeFactE.to_excel(writer, sheet_name='SIGGE_E', index=False)
         SiggeFactP.to_excel(writer, sheet_name='SIGGE_P', index=False)
         
-        if( IdCliente == 1 ):
-            FactEstimada.to_excel(writer, sheet_name='FACT_EST_EFACT', index=False)
+        # if( IdCliente == 1 ):
+        #     FactEstimada.to_excel(writer, sheet_name='FACT_EST_EFACT', index=False)
         
         EfactCNE.to_excel(writer, sheet_name='EFACT_CNE', index=False)
         EfactCNE_BT.to_excel(writer, sheet_name='EfactCNE_BT', index=False)
@@ -844,20 +855,20 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         ReliquidacionEFACT['B5'] = Bloque
 
         #Fix Formato Fechas
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['B9':'B65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['B9':'B14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 cellObj.number_format = 'DD-MM-YYYY'
         
         # # LO QUE SE FACTURÓ
         # #Columna C: ORIGEN DATA
-        # for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['C9':'C65']):
+        # for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['C9':'C14']):
         #     for n, cellObj in enumerate(rowOfCellObjects):
         #         Valor = f"""={cellObj.value}""" #{i+9}
         #         # Valor = f"""=IF(VLOOKUP(B{i+9},MAPA_DATA!D:G,2,0)=1,"FACT_EMITIDA",IF(VLOOKUP(B{i+9},MAPA_DATA!D:G,3,0)=1,"FACT_EST_EFACT",(IF(VLOOKUP(B{i+9},MAPA_DATA!D:G,4,0)=1,"FACT_EST_CEN","SIN_DATA"))))"""
         #         # print(Valor)
         #         cellObj.value = Valor
         
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['D9':'J65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['D9':'J14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
@@ -865,95 +876,95 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
         # LO QUE SE DEBIÓ HABER FACTURADO
         # #Columna L: ORIGEN DATA
-        # for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['L9':'L65']):
+        # for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['L9':'L14']):
         #     for n, cellObj in enumerate(rowOfCellObjects):
         #         # Valor = f"""={cellObj.value}""" #{i+9}
         #         Valor = f"""=IF(VLOOKUP(B{i+9},MAPA_DATA!D:I,5,0)=1,"EFACT_CNE",IF(VLOOKUP(B{i+9},MAPA_DATA!D,I,6,0)=1,"EFACT_EST_CNE","SIN_DATA"))"""
         #         cellObj.value = Valor
         
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['M9':'S65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['M9':'S14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
         
         #Columna V: Reliquidación mensual ($)
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['V9':'V65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['V9':'V14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
         #Columna AB: N° de días de intereses
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AB9':'AB65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AB9':'AB14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
         #Columna AC: Interés total según n° de días
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AC9':'AC65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AC9':'AC14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
         #Columna AD: Intereses ($)
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AD9':'AD65']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AD9':'AD14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
         #Columna AE: Reliquidación Total ($)
-        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AE9':'AE66']):
+        for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AE9':'AE15']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
 
 
         
-        #**********     HOJA "Reliquidacion CEN" **********#
-        if( IdCliente == 1 ):
-                ReliquidacionCEN = DocumentoExcel["ReliquidacionCEN"]
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['A1':'AE1']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        cellObj.value = ''
-                ReliquidacionCEN['B2'] = Empresa
-                ReliquidacionCEN['B3'] = NomAgrupacion
-                ReliquidacionCEN['B5'] = Bloque
+        # #**********     HOJA "Reliquidacion CEN" **********#
+        # if( IdCliente == 1 ):
+        #         ReliquidacionCEN = DocumentoExcel["ReliquidacionCEN"]
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['A1':'AE1']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 cellObj.value = ''
+        #         ReliquidacionCEN['B2'] = Empresa
+        #         ReliquidacionCEN['B3'] = NomAgrupacion
+        #         ReliquidacionCEN['B5'] = Bloque
 
-                #Fix Formato Fechas
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['B9':'B65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        cellObj.number_format = 'DD-MM-YYYY'
+        #         #Fix Formato Fechas
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['B9':'B14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 cellObj.number_format = 'DD-MM-YYYY'
 
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['D9':'J65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['D9':'J14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
 
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['M9':'S65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['M9':'S14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
 
-                #Columna V: Reliquidación mensual ($)
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['V9':'V65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
-                #Columna AB: N° de días de intereses
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AB9':'AB65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
-                #Columna AC: Interés total según n° de días
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AC9':'AC65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
-                #Columna AD: Intereses ($)
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AD9':'AD65']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
-                #Columna AE: Reliquidación Total ($)
-                for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AE9':'AE66']):
-                    for n, cellObj in enumerate(rowOfCellObjects):
-                        Valor = f"""={cellObj.value}"""
-                        cellObj.value = Valor
+        #         #Columna V: Reliquidación mensual ($)
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['V9':'V14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
+        #         #Columna AB: N° de días de intereses
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AB9':'AB14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
+        #         #Columna AC: Interés total según n° de días
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AC9':'AC14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
+        #         #Columna AD: Intereses ($)
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AD9':'AD14']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
+        #         #Columna AE: Reliquidación Total ($)
+        #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['AE9':'AE15']):
+        #             for n, cellObj in enumerate(rowOfCellObjects):
+        #                 Valor = f"""={cellObj.value}"""
+        #                 cellObj.value = Valor
         
 
 
@@ -967,11 +978,11 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         ResumenRetiros['B5'] = Bloque
 
         #Fix Formato Fechas
-        for i, rowOfCellObjects in enumerate(ResumenRetiros['B9':'B65']):
+        for i, rowOfCellObjects in enumerate(ResumenRetiros['B9':'B14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 cellObj.number_format = 'DD-MM-YYYY'
         
-        for i, rowOfCellObjects in enumerate(ResumenRetiros['D9':'H66']):
+        for i, rowOfCellObjects in enumerate(ResumenRetiros['D9':'H15']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
@@ -986,14 +997,17 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         wbxl = xw.Book(NomExcel)
         app = xw.apps.active
         Hoja_EFACT = wbxl.sheets['ReliquidacionEFACT']
-        ReliquidacionEFACT = Hoja_EFACT.range('AE66').value
+        ReliquidacionEFACT = Hoja_EFACT.range('AE15').value
 
-        Hoja_Reliquidacion = wbxl.sheets['ReliquidacionCEN']
+        Hoja_Reliquidacion = wbxl.sheets['ReliquidacionEFACT']
         
         ReliquidacionCEN = 0
+        if( ReliquidacionEFACT is None ):
+            ReliquidacionEFACT = 0
+        
         if( IdCliente == 1 ):
-            Hoja_CEN = wbxl.sheets['ReliquidacionCEN']
-            ReliquidacionCEN = Hoja_CEN.range('AE66').value
+            # Hoja_CEN = wbxl.sheets['ReliquidacionCEN']
+            # ReliquidacionCEN = Hoja_CEN.range('AE15').value
             print("ReliquidacionEFACT:", ReliquidacionEFACT, "| ReliquidacionCEN:", ReliquidacionCEN) #, "| Diferencia:", (ReliquidacionEFACT-ReliquidacionCEN))
         if( ReliquidacionCEN is None ):
             # ReliquidacionCEN = 0
@@ -1002,11 +1016,11 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         #if( IdCliente == 2 ):
         
         Hoja_Retiros = wbxl.sheets['ResumenRetiros']
-        Energia_SIGGE_kWh = Hoja_Retiros.range('D66').value
-        Energia_EFACT_AT_kWh = Hoja_Retiros.range('E66').value
-        Energia_EFACT_BT_kWh = Hoja_Retiros.range('F66').value
-        Energia_Coordinador_AT_kWh = Hoja_Retiros.range('G66').value
-        Energia_Coordinador_BT_kWh = Hoja_Retiros.range('H66').value
+        Energia_SIGGE_kWh = Hoja_Retiros.range('D15').value
+        Energia_EFACT_AT_kWh = Hoja_Retiros.range('E15').value
+        Energia_EFACT_BT_kWh = Hoja_Retiros.range('F15').value
+        Energia_Coordinador_AT_kWh = Hoja_Retiros.range('G15').value
+        Energia_Coordinador_BT_kWh = Hoja_Retiros.range('H15').value
 
         conn2 = pyodbc.connect('DRIVER={SQL Server};SERVER='+Server+';DATABASE='+Database+';UID='+Username+';PWD='+ Password)
         cursor2 = conn2.cursor()
@@ -1018,28 +1032,28 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 AND Distribuidora = '{NomAgrupacion}'
                 AND Bloque = '{Bloque}'
 
-        INSERT INTO dbo.{AbrevCliente}_ResumenRetiros ( Licitacion, Generadora, Distribuidora, Bloque, Energia_SIGGE_kWh, Energia_EFACT_AT_kWh, Energia_EFACT_BT_kWh, Energia_Coordinador_AT_kWh, Energia_Coordinador_BT_kWh )
-        VALUES ( '{Licitacion}', '{Empresa}', '{NomAgrupacion}', '{Bloque}', {Energia_SIGGE_kWh}, {Energia_EFACT_AT_kWh}, {Energia_EFACT_BT_kWh}, {Energia_Coordinador_AT_kWh}, {Energia_Coordinador_BT_kWh} )
+        INSERT INTO dbo.{AbrevCliente}_ResumenRetiros ( Licitacion, Generadora, Distribuidora, Bloque, Energia_SIGGE_kWh, Energia_EFACT_AT_kWh, Energia_EFACT_BT_kWh, Energia_Coordinador_AT_kWh, Energia_Coordinador_BT_kWh, Desde, Hasta, DateCreated )
+        VALUES ( '{Licitacion}', '{Empresa}', '{NomAgrupacion}', '{Bloque}', {Energia_SIGGE_kWh}, {Energia_EFACT_AT_kWh}, {Energia_EFACT_BT_kWh}, {Energia_Coordinador_AT_kWh}, {Energia_Coordinador_BT_kWh}, '{Desde}', '{Hasta}', GETDATE() )
         """)
         conn2.commit()
         cursor2.close()
         conn2.close()
 
         # Recorre la hoja de Reliquidacion para generar resumen
-        DF_GxBq = Hoja_Reliquidacion.range('B8:J65').options(pandas.Series, expand='table', index=0).value
+        DF_GxBq = Hoja_Reliquidacion.range('B8:J14').options(pandas.Series, expand='table', index=0).value
         DF_GxBq = DF_GxBq.drop(DF_GxBq.columns[[1,2,3,4,5,6,7]], axis='columns')
         DF_GxBq = DF_GxBq.rename(columns={
             'MES': 'Fecha',
-            'Monto Total ($)': 'Definitivo ($)'
-        })
-
-        df1 = Hoja_Reliquidacion.range('S8:S65').options(pandas.Series, expand='table', index=0).value
-        DF_GxBq = pandas.concat([DF_GxBq, df1], axis=1,)
-        DF_GxBq = DF_GxBq.rename(columns={
             'Monto Total ($)': 'Facturado ($)'
         })
 
-        df2 = Hoja_Reliquidacion.range('V8:AE65').options(pandas.Series, expand='table', index=0).value
+        df1 = Hoja_Reliquidacion.range('S8:S14').options(pandas.Series, expand='table', index=0).value
+        DF_GxBq = pandas.concat([DF_GxBq, df1], axis=1,)
+        DF_GxBq = DF_GxBq.rename(columns={
+            'Monto Total ($)': 'Definitivo ($)'
+        })
+
+        df2 = Hoja_Reliquidacion.range('V8:AE14').options(pandas.Series, expand='table', index=0).value
         df2 = df2.rename(columns={
             'Reliquidación mensual ($)': 'Reliquidación ($)',
             'Decreto PNP Reliquidación': 'Decreto PNP'
@@ -1057,7 +1071,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             df_fecha = DF_GxBq['Fecha']
             DF_Resumen = pandas.concat([df_fecha, DF_Resumen], axis=1,)
         
-        df3 = Hoja_Reliquidacion.range('AE8:AE65').options(pandas.Series, expand='table', index=0).value
+        df3 = Hoja_Reliquidacion.range('AE8:AE14').options(pandas.Series, expand='table', index=0).value
         df3 = df3.rename( NomHoja )
 
         DF_Resumen = pandas.concat([DF_Resumen, df3], axis=1,)
@@ -1076,8 +1090,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         AND Distribuidora = '{NomAgrupacion}'
                         AND Bloque = '{Bloque}'
 
-                INSERT INTO dbo.{AbrevCliente}_Reliquidacion ( Licitacion, Generadora, Distribuidora, Bloque, ReliquidacionEFACT, ReliquidacionCEN )
-                VALUES ( '{Licitacion}', '{Empresa}', '{NomAgrupacion}', '{Bloque}', {ReliquidacionEFACT}, {ReliquidacionCEN} )
+                INSERT INTO dbo.{AbrevCliente}_Reliquidacion ( Licitacion, Generadora, Distribuidora, Bloque, ReliquidacionEFACT, ReliquidacionCEN, Desde, Hasta, DateCreated )
+                VALUES ( '{Licitacion}', '{Empresa}', '{NomAgrupacion}', '{Bloque}', {ReliquidacionEFACT}, {ReliquidacionCEN}, '{Desde}', '{Hasta}', GETDATE() )
             """)
             conn3.commit()
             cursor3.close()
