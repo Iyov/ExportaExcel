@@ -49,7 +49,7 @@ print( f"""Reliquidación de '{AbrevCliente}' desde {str(Desde)} al {str(Hasta)}
 
 #region Obtiene las Agrupaciones y los Contratos para recorrer
 #Son 30, es un SP => son 27 con datos, filtrar Ids 12, 19, 20
-ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion IN (6, 5, 28, 4)', engine) #NOT IN (12, 19, 20) 23,25,28
+ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion IN (6, 16, 24, 26, 27, 5, 28, 4)', engine) #NOT IN ()
 
 #Son 8: Caren BS1 A, B, C, BS3; Norvind BS4; San Juan BS2A, 2C y 3
 ListaGxBloques = pandas.read_sql("SELECT * FROM dbo.CNE_GxBloque WHERE IdCliente = '" + AbrevCliente + "'", engine) # AND GX = ''
@@ -262,6 +262,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         FROM	dbo.CNE_EfactPNP2 e
                 LEFT JOIN dbo.CNE_EfactPNP_Diccionario d
                     ON  e.IdEfact = d.IdEfact
+                        AND e.FechaEFact = d.Fecha  --Fix FB 2022-04-08
                         AND e.IdDistribuidora = d.IdDistribuidora
                         AND e.IdGeneradora = d.IdGeneradora
                         AND e.IdCodigoContrato = d.IdCodigoContrato
@@ -286,8 +287,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 PuntoRetiro,
                 NomBarra
         """
-        # if(Debug): 
-        print(QueryEfact)
+        # if(Debug): print(QueryEfact)
 
         EfactCNE = pandas.read_sql(QueryEfact, engine)
 
