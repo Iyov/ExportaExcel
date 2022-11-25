@@ -1,6 +1,8 @@
+from turtle import width
 import pandas
 import sqlalchemy
 import openpyxl
+from openpyxl.styles import NamedStyle, Font, Border, Side
 import xlwings as xw
 import os
 import pyodbc
@@ -49,7 +51,7 @@ print( f"""Reliquidación de '{AbrevCliente}' desde {str(Desde)} al {str(Hasta)}
 
 #region Obtiene las Agrupaciones y los Contratos para recorrer
 #Son 30, es un SP => son 27 con datos, filtrar Ids 12, 19, 20
-ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion IN (6, 16, 24, 26, 27, 5, 28, 4)', engine) #NOT IN ()
+ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion NOT IN (12, 19, 20)', engine) #NOT IN (12, 19, 20) IN (4, 6, 16, 24, 26, 27, 5, 28)
 
 #Son 8: Caren BS1 A, B, C, BS3; Norvind BS4; San Juan BS2A, 2C y 3
 ListaGxBloques = pandas.read_sql("SELECT * FROM dbo.CNE_GxBloque WHERE IdCliente = '" + AbrevCliente + "'", engine) # AND GX = ''
@@ -97,6 +99,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
         #region Ejecuta las Querys SQL y las convierte en DataFrames
 
+        #region EFACT
         QueryEfact = f"""
         SELECT	c.IdContrato,
                 CONVERT(VARCHAR(100), c.Fecha, 105) AS MesDevengado,
@@ -259,8 +262,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 e.PRec_Peso AS TotalPotencia,
 
                 e.FechaEfact AS Fecha
-        FROM	dbo.CNE_EfactPNP2 e
-                LEFT JOIN dbo.CNE_EfactPNP_Diccionario d
+        FROM	dbo.CNE_EfactPNP2022 e
+                LEFT JOIN dbo.CNE_EfactPNP_Diccionario2022 d
                     ON  e.IdEfact = d.IdEfact
                         AND e.FechaEFact = d.Fecha  --Fix FB 2022-04-08
                         AND e.IdDistribuidora = d.IdDistribuidora
@@ -268,11 +271,11 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         AND e.IdCodigoContrato = d.IdCodigoContrato
                         AND e.IdPuntoRetiro = d.IdPuntoRetiro
                 LEFT JOIN dbo.CNE_DiccionarioBarra db ON e.IdBarraNacionalFR = db.IdBarraNacional
-                LEFT JOIN dbo.{AbrevCliente}_AgrupacionEfactNew2 ae
-                   ON   ae.Generadora = d.Generadora
-                        AND ae.Distribuidora = d.Distribuidora
-                        AND ae.CodigoContrato = d.CodigoContrato
-                LEFT JOIN dbo.Agrupacion a ON ae.IdAgrupacion = a.IdAgrupacion
+                --LEFT JOIN dbo.{AbrevCliente}_AgrupacionEfactNew2 ae
+                --   ON   ae.Generadora = d.Generadora
+                --        AND ae.Distribuidora = d.Distribuidora
+                --        AND ae.CodigoContrato = d.CodigoContrato
+                LEFT JOIN dbo.Agrupacion a ON e.IdAgrupacion = a.IdAgrupacion
                 LEFT JOIN dbo.CNE_FactorAjuste f ON e.FechaEfact = f.Fecha
         WHERE	e.PNP_Version = 'ITD'
                 AND (
@@ -371,11 +374,12 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         """
         # if(Debug): print(QueryEfactCNE_BT)
         EfactCNE_BT = pandas.read_sql(QueryEfactCNE_BT, engine)
+        #endregion
 
-        
+        #region Facturacion de SIGGE
         QuerySigge = f"""
             SELECT  CONVERT(VARCHAR(100), f.Periodo, 105) AS Periodo,
-                    CONVERT(VARCHAR(100), m.MesDevengado, 105) AS MesDevengado,
+                    CONVERT(VARCHAR(100), f.MesDevengado, 105) AS MesDevengado,
                     f.Nombre,
                     f.Concepto,
                     dc.Agrupacion,
@@ -390,7 +394,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     f.ClaveEEDD,
                     f.Licitacion,
                     a.NomAgrupacion,
-		            f.Num,
+                            f.Num,
                     f.Barra,
                     CASE
                         WHEN dc.Agrupacion = 'Energía' THEN f.Cantidad
@@ -409,19 +413,19 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         ELSE NULL
                     END MontoPotencia,
                     f.Precio
-            FROM    dbo.{AbrevCliente}_SIGGE_Fact f
-                    LEFT JOIN dbo.{AbrevCliente}_AgrupacionSIGGE asi ON f.Nombre = asi.CodigoContrato
-                    LEFT JOIN dbo.Agrupacion a ON asi.IdAgrupacion = a.IdAgrupacion
-                    LEFT JOIN dbo.{AbrevCliente}_MesDevengado m ON f.Glosa = m.Glosa
+            FROM    dbo.{AbrevCliente}_SIGGE_Fact3 f
+                    --LEFT JOIN dbo.{AbrevCliente}_AgrupacionSIGGE asi ON f.Nombre = asi.CodigoContrato
+                    LEFT JOIN dbo.Agrupacion a ON f.IdAgrupacion = a.IdAgrupacion
+                    --LEFT JOIN dbo.{AbrevCliente}_MesDevengado m ON f.Glosa = m.Glosa
                     LEFT JOIN dbo.SIGGE_DiccionarioConceptos dc ON f.Concepto = dc.Concepto
             WHERE   ( f.Empresa LIKE '%{Empresa}%' OR f.Empresa LIKE '%{GX_Sigge}%' )
                     AND f.Bloque = '{Bloque}'
                     AND a.NomAgrupacion = '{NomAgrupacion}'
                     AND f.Folio IS NOT NULL		--ACL 2021-05-20
                     AND dc.Agrupacion IN (|Agrupador|)
-                    AND m.MesDevengado BETWEEN CAST('{Desde}' AS DATETIME) AND CAST('{Hasta}' AS DATETIME)
+                    AND f.MesDevengado BETWEEN CAST('{Desde}' AS DATETIME) AND CAST('{Hasta}' AS DATETIME)
             GROUP BY f.Periodo,
-                    m.MesDevengado,
+                    f.MesDevengado,
                     f.Nombre,
                     f.Num,
                     f.Barra,
@@ -446,7 +450,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     f.Barra
         """
         Agrupador = "'Energía', 'Potencia'"
-        if(Debug): print(QuerySigge.replace("|Agrupador|", Agrupador))
+        #if(Debug): print(QuerySigge.replace("|Agrupador|", Agrupador))
 
         SiggeFact = pandas.read_sql(QuerySigge.replace("|Agrupador|", Agrupador), engine)
 
@@ -455,7 +459,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
         Agrupador = "'Potencia'"
         SiggeFactP = pandas.read_sql(QuerySigge.replace("|Agrupador|", Agrupador), engine)
+        #endregion
 
+        #region CEN
         QueryCoordinador_Energia = f"""
             SELECT  ce.Num,
                     CONVERT(VARCHAR(100), ce.Fecha, 105) AS MesDevengado,
@@ -545,7 +551,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     AND ce.Fecha BETWEEN CAST('{Desde}' AS DATETIME) AND CAST('{Hasta}' AS DATETIME)
             ORDER BY 2,5,6,10,13,16
         """
-        Coordinador_Energia = pandas.read_sql(QueryCoordinador_Energia, engine)
+        # Coordinador_Energia = pandas.read_sql(QueryCoordinador_Energia, engine)
 
         QueryCEN_EnergiaBT = f"""
             SELECT  DISTINCT
@@ -576,9 +582,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     AND e.Fecha BETWEEN CAST('{Desde}' AS DATETIME) AND CAST('{Hasta}' AS DATETIME)
             ORDER BY 2,5,6,9
         """
-        if(Debug): print(QueryCEN_EnergiaBT)
+        # if(Debug): print(QueryCEN_EnergiaBT)
         # ACL+FB+OM 2021-10-25: Se quita Energia en BT de las planillas ya que arroja error en SJ BS3 CRELL
-        CEN_EnergiaBT = pandas.read_sql(QueryCEN_EnergiaBT, engine)
+        # CEN_EnergiaBT = pandas.read_sql(QueryCEN_EnergiaBT, engine)
 
         QueryCoordinador_Potencia = f"""
             SELECT  cp.Num,
@@ -661,9 +667,11 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     AND cp.Fecha BETWEEN CAST('{Desde}' AS DATETIME) AND CAST('{Hasta}' AS DATETIME)
             ORDER BY 2,5,6,10,13,16
         """
-        Coordinador_Potencia = pandas.read_sql(QueryCoordinador_Potencia, engine)
+        # Coordinador_Potencia = pandas.read_sql(QueryCoordinador_Potencia, engine)
+        #endregion
 
         if( IdCliente == 1 ):
+            #region Facturacion Estimada
             QueryFactEstimada = f"""
                 SELECT	c.IdContrato,
                         CONVERT(VARCHAR(100), c.Fecha, 105) AS MesDevengado,
@@ -750,22 +758,24 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         NomBarra
             """
             # FactEstimada = pandas.read_sql(QueryFactEstimada, engine)
+            #endregion
             
+            #region Facturacion Real
             QueryReal = f"""
                 SELECT	f.Empresa,
                         CONVERT(VARCHAR(100), f.MesDevengado, 105) AS MesDevengado,
                         f.IdAgrupacion,
                         a.NomAgrupacion,
                         f.Bloque,
-                        f.NombreCliente,
-                        f.FechaDeContabilizacion,
-                        f.PrefijoFolio,
-                        f.CuentaDeMayor,
-                        f.CodigoDeArticulo,
-                        f.NumDeFolio,
-                        SUM(f.TotalCLP) AS MontoCLP,
-                        SUM(f.TotalUSD) AS TotalUSD
-                FROM	dbo.LAP_Facturacion2 f
+						f.Nombre AS NombreCliente,
+						f.FechaCarga AS FechaDeContabilizacion,
+						f.TipoDocumento AS PrefijoFolio,
+						-1 AS CuentaDeMayor,
+						f.CodigoDeArticulo,
+						f.Folio AS NumDeFolio,
+                        SUM(f.Monto) AS MontoCLP
+                        --,SUM(f.TotalUSD) AS TotalUSD
+                FROM	dbo.LAP_Facturacion2021 f
                         LEFT JOIN dbo.Agrupacion a ON f.IdAgrupacion = a.IdAgrupacion
                         LEFT JOIN dbo.DolarMes d ON f.MesDevengado = d.Fecha
                 WHERE	f.IdAgrupacion != -1
@@ -783,12 +793,12 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         f.IdAgrupacion,
                         a.NomAgrupacion,
                         f.Bloque,
-                        f.NombreCliente,
-                        f.FechaDeContabilizacion,
-                        f.PrefijoFolio,
-                        f.CuentaDeMayor,
+                        f.Nombre,
+                        f.FechaCarga,
+                        f.TipoDocumento,
+                        --f.CuentaDeMayor,
                         f.CodigoDeArticulo,
-                        f.NumDeFolio
+                        f.Folio
                 ORDER BY 1,2,3,4
             """
 
@@ -801,6 +811,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
             Agrupador = "'VENTA PPA POTENCIA'"
             FactReal_P = pandas.read_sql(QueryReal.replace("|Agrupador|", Agrupador), engine)
+            #endregion
 
         #endregion
 
@@ -827,9 +838,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         EfactCNE.to_excel(writer, sheet_name='EFACT_CNE', index=False)
         EfactCNE_BT.to_excel(writer, sheet_name='EfactCNE_BT', index=False)
 
-        Coordinador_Energia.to_excel(writer, sheet_name='CEN_Energia', index=False) #Actualizar CEN
-        Coordinador_Potencia.to_excel(writer, sheet_name='CEN_Potencia', index=False)
-        CEN_EnergiaBT.to_excel(writer, sheet_name='CEN_EnergiaBT', index=False)
+        TemplateS.to_excel(writer, sheet_name='CEN_Energia', index=False) #Actualizar CEN #Coordinador_Energia
+        TemplateS.to_excel(writer, sheet_name='CEN_Potencia', index=False) #Coordinador_Potencia
+        TemplateS.to_excel(writer, sheet_name='CEN_EnergiaBT', index=False) #CEN_EnergiaBT
         
         TemplateS.to_excel(writer, sheet_name='EFACT_EST_CEN', index=False) #Actualizar CEN
         TemplateS.to_excel(writer, sheet_name='SIN_DATA', index=False)
@@ -844,12 +855,22 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
         DocumentoExcel = openpyxl.load_workbook(NomExcel, data_only=True)
         print( "Archivo", NomExcel, "cargado..." )
+
+        # highlight = NamedStyle(name="highlight")
+        # highlight.font = Font(bold=True, size=20)
+        # # bd = Side(style='thick', color="000000")
+        # # highlight.border = Border(left=bd, top=bd, right=bd, bottom=bd)
+
+        # DocumentoExcel.add_named_style(highlight)
         
         #**********     HOJA "Reliquidacion EFACT" **********#
         ReliquidacionEFACT = DocumentoExcel["ReliquidacionEFACT"]
+
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['A1':'AE1']):
             for n, cellObj in enumerate(rowOfCellObjects):
-                cellObj.value = ''
+                cellObj.value = f"""""" #{n}
+                # cellObj.style = highlight
+        
         ReliquidacionEFACT['B2'] = Empresa
         ReliquidacionEFACT['B3'] = NomAgrupacion
         ReliquidacionEFACT['B5'] = Bloque
@@ -1022,22 +1043,23 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         Energia_Coordinador_AT_kWh = Hoja_Retiros.range('G15').value
         Energia_Coordinador_BT_kWh = Hoja_Retiros.range('H15').value
 
-        conn2 = pyodbc.connect('DRIVER={SQL Server};SERVER='+Server+';DATABASE='+Database+';UID='+Username+';PWD='+ Password)
-        cursor2 = conn2.cursor()
-        cursor2.execute(f"""
-        DELETE
-        FROM    dbo.{AbrevCliente}_ResumenRetiros
-        WHERE   Licitacion = '{Licitacion}'
-                AND Generadora = '{Empresa}'
-                AND Distribuidora = '{NomAgrupacion}'
-                AND Bloque = '{Bloque}'
+        if( Debug == False ):
+            conn2 = pyodbc.connect('DRIVER={SQL Server};SERVER='+Server+';DATABASE='+Database+';UID='+Username+';PWD='+ Password)
+            cursor2 = conn2.cursor()
+            cursor2.execute(f"""
+            DELETE
+            FROM    dbo.{AbrevCliente}_ResumenRetiros
+            WHERE   Licitacion = '{Licitacion}'
+                    AND Generadora = '{Empresa}'
+                    AND Distribuidora = '{NomAgrupacion}'
+                    AND Bloque = '{Bloque}'
 
-        INSERT INTO dbo.{AbrevCliente}_ResumenRetiros ( Licitacion, Generadora, Distribuidora, Bloque, Energia_SIGGE_kWh, Energia_EFACT_AT_kWh, Energia_EFACT_BT_kWh, Energia_Coordinador_AT_kWh, Energia_Coordinador_BT_kWh, Desde, Hasta, DateCreated )
-        VALUES ( '{Licitacion}', '{Empresa}', '{NomAgrupacion}', '{Bloque}', {Energia_SIGGE_kWh}, {Energia_EFACT_AT_kWh}, {Energia_EFACT_BT_kWh}, {Energia_Coordinador_AT_kWh}, {Energia_Coordinador_BT_kWh}, '{Desde}', '{Hasta}', GETDATE() )
-        """)
-        conn2.commit()
-        cursor2.close()
-        conn2.close()
+            INSERT INTO dbo.{AbrevCliente}_ResumenRetiros ( Licitacion, Generadora, Distribuidora, Bloque, Energia_SIGGE_kWh, Energia_EFACT_AT_kWh, Energia_EFACT_BT_kWh, Energia_Coordinador_AT_kWh, Energia_Coordinador_BT_kWh, Desde, Hasta, DateCreated )
+            VALUES ( '{Licitacion}', '{Empresa}', '{NomAgrupacion}', '{Bloque}', {Energia_SIGGE_kWh}, {Energia_EFACT_AT_kWh}, {Energia_EFACT_BT_kWh}, {Energia_Coordinador_AT_kWh}, {Energia_Coordinador_BT_kWh}, '{Desde}', '{Hasta}', GETDATE() )
+            """)
+            conn2.commit()
+            cursor2.close()
+            conn2.close()
 
         # Recorre la hoja de Reliquidacion para generar resumen
         DF_GxBq = Hoja_Reliquidacion.range('B8:J14').options(pandas.Series, expand='table', index=0).value
@@ -1079,7 +1101,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         wbxl.close()
         app.kill()
 
-        if( ReliquidacionEFACT is not None ):
+        if( Debug == False and ReliquidacionEFACT is not None ):
             conn3 = pyodbc.connect('DRIVER={SQL Server};SERVER='+Server+';DATABASE='+Database+';UID='+Username+';PWD='+ Password)
             cursor3 = conn3.cursor()
             cursor3.execute(f"""
