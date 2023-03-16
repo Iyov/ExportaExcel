@@ -1,7 +1,18 @@
 # ExportaExcel
 Proyecto de Exportación a Excel para generar el detalle de la Reliquidación
 
-## Descripcón
+## Librerías a instalar
+```
+pip install pandas
+pip install sqlalchemy
+python -m pip install --upgrade 'sqlalchemy<2.0'
+pip install openpyxl
+pip install xlwings
+pip install pyodbc
+pip install xlsxwriter
+```
+
+## Descripción
 Se genera un archivo Excel por cada Licitación, Empresa Generadora, Bloque Suministro, Empresa Distribuidora
 
 ### Ejemplos

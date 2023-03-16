@@ -4,8 +4,11 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-pyodbc = "*"
+pandas = "*"
+sqlalchemy = "1.4.46"
+openpyxl = "*"
 xlwings = "*"
+pyodbc = "*"
 
 [dev-packages]
 

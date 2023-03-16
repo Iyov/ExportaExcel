@@ -1,8 +1,8 @@
-from turtle import width
+#from turtle import width
 import pandas
 import sqlalchemy
 import openpyxl
-from openpyxl.styles import NamedStyle, Font, Border, Side
+from openpyxl.styles import Border, Side, PatternFill, Font, colors
 import xlwings as xw
 import os
 import pyodbc
@@ -51,7 +51,7 @@ print( f"""Reliquidación de '{AbrevCliente}' desde {str(Desde)} al {str(Hasta)}
 
 #region Obtiene las Agrupaciones y los Contratos para recorrer
 #Son 30, es un SP => son 27 con datos, filtrar Ids 12, 19, 20
-ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion NOT IN (12, 19, 20)', engine) #NOT IN (12, 19, 20) IN (4, 6, 16, 24, 26, 27, 5, 28)
+ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion IN (1)', engine) #NOT IN (12, 19, 20) IN (4, 6, 16, 24, 26, 27, 5, 28)
 
 #Son 8: Caren BS1 A, B, C, BS3; Norvind BS4; San Juan BS2A, 2C y 3
 ListaGxBloques = pandas.read_sql("SELECT * FROM dbo.CNE_GxBloque WHERE IdCliente = '" + AbrevCliente + "'", engine) # AND GX = ''
@@ -775,7 +775,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 						f.Folio AS NumDeFolio,
                         SUM(f.Monto) AS MontoCLP
                         --,SUM(f.TotalUSD) AS TotalUSD
-                FROM	dbo.LAP_Facturacion2021 f
+                FROM	dbo.LAP_Facturacion2022 f
                         LEFT JOIN dbo.Agrupacion a ON f.IdAgrupacion = a.IdAgrupacion
                         LEFT JOIN dbo.DolarMes d ON f.MesDevengado = d.Fecha
                 WHERE	f.IdAgrupacion != -1
@@ -849,27 +849,43 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         #endregion
 
         # Close the Pandas Excel writer and output the Excel file.
-        writer.save()
+        writer.close()
 
         #region Convierte los metadatos de los templates en cálculos reales
 
         DocumentoExcel = openpyxl.load_workbook(NomExcel, data_only=True)
         print( "Archivo", NomExcel, "cargado..." )
 
-        # highlight = NamedStyle(name="highlight")
-        # highlight.font = Font(bold=True, size=20)
-        # # bd = Side(style='thick', color="000000")
-        # # highlight.border = Border(left=bd, top=bd, right=bd, bottom=bd)
-
-        # DocumentoExcel.add_named_style(highlight)
+        # Creamos un objeto de estilo para la celda
+        borde = Border( left=Side(border_style='thin', color='393939'),
+                        right=Side(border_style='thin', color='393939'),
+                        top=Side(border_style='thin', color='393939'),
+                        bottom=Side(border_style='thin', color='393939'))
+        
+        # Creamos un objeto de estilo para el relleno de la celda
+        relleno = PatternFill(  start_color='9BBB59',
+                                end_color='9BBB59',
+                                fill_type='solid')
+        
+        # Crea una fuente en negrita y tamaño 12
+        fuente = Font(bold=True, color='FFFFFF', size=11)
         
         #**********     HOJA "Reliquidacion EFACT" **********#
         ReliquidacionEFACT = DocumentoExcel["ReliquidacionEFACT"]
 
+        # itera sobre la fila y establece el ancho automático
+        for row in ReliquidacionEFACT.iter_rows(min_row=8, max_row=8):
+            for cellObj in row:
+                ReliquidacionEFACT.column_dimensions[cellObj.column_letter].width = 18 #'auto'
+                #cellObj.column_dimensions[cellObj.column_letter].width = "auto"
+                cellObj.border = borde
+                cellObj.fill = relleno
+                cellObj.font = fuente
+        
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['A1':'AE1']):
+            #ReliquidacionEFACT.column_dimensions[i].width = 20
             for n, cellObj in enumerate(rowOfCellObjects):
-                cellObj.value = f"""""" #{n}
-                # cellObj.style = highlight
+                cellObj.value = f""""""
         
         ReliquidacionEFACT['B2'] = Empresa
         ReliquidacionEFACT['B3'] = NomAgrupacion
@@ -880,28 +896,10 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             for n, cellObj in enumerate(rowOfCellObjects):
                 cellObj.number_format = 'DD-MM-YYYY'
         
-        # # LO QUE SE FACTURÓ
-        # #Columna C: ORIGEN DATA
-        # for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['C9':'C14']):
-        #     for n, cellObj in enumerate(rowOfCellObjects):
-        #         Valor = f"""={cellObj.value}""" #{i+9}
-        #         # Valor = f"""=IF(VLOOKUP(B{i+9},MAPA_DATA!D:G,2,0)=1,"FACT_EMITIDA",IF(VLOOKUP(B{i+9},MAPA_DATA!D:G,3,0)=1,"FACT_EST_EFACT",(IF(VLOOKUP(B{i+9},MAPA_DATA!D:G,4,0)=1,"FACT_EST_CEN","SIN_DATA"))))"""
-        #         # print(Valor)
-        #         cellObj.value = Valor
-        
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['D9':'J14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
-        
-
-        # LO QUE SE DEBIÓ HABER FACTURADO
-        # #Columna L: ORIGEN DATA
-        # for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['L9':'L14']):
-        #     for n, cellObj in enumerate(rowOfCellObjects):
-        #         # Valor = f"""={cellObj.value}""" #{i+9}
-        #         Valor = f"""=IF(VLOOKUP(B{i+9},MAPA_DATA!D:I,5,0)=1,"EFACT_CNE",IF(VLOOKUP(B{i+9},MAPA_DATA!D,I,6,0)=1,"EFACT_EST_CNE","SIN_DATA"))"""
-        #         cellObj.value = Valor
         
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['M9':'S14']):
             for n, cellObj in enumerate(rowOfCellObjects):
@@ -913,6 +911,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
+                cellObj.number_format = '#,##0.00'
         #Columna AB: N° de días de intereses
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AB9':'AB14']):
             for n, cellObj in enumerate(rowOfCellObjects):
@@ -923,18 +922,20 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
+                cellObj.number_format = '#,##0.0000'
         #Columna AD: Intereses ($)
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AD9':'AD14']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
+                cellObj.number_format = '#,##0.0000'
         #Columna AE: Reliquidación Total ($)
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['AE9':'AE15']):
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
-
-
+                cellObj.number_format = '#,##0.0'
+                cellObj.font = openpyxl.styles.Font(bold=True)
         
         # #**********     HOJA "Reliquidacion CEN" **********#
         # if( IdCliente == 1 ):
@@ -1007,7 +1008,21 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             for n, cellObj in enumerate(rowOfCellObjects):
                 Valor = f"""={cellObj.value}"""
                 cellObj.value = Valor
-
+        
+        # itera sobre la fila y establece el ancho automático
+        ResumenRetiros.column_dimensions['A'].width = 12
+        ResumenRetiros.column_dimensions['B'].width = 13
+        ResumenRetiros.column_dimensions['C'].width = 14
+        ResumenRetiros.column_dimensions['D'].width = 26
+        ResumenRetiros.column_dimensions['E'].width = 26
+        ResumenRetiros.column_dimensions['F'].width = 30
+        ResumenRetiros.column_dimensions['G'].width = 30
+        ResumenRetiros.column_dimensions['H'].width = 30
+        for row in ResumenRetiros.iter_rows(min_row=8, max_row=8, min_col=1, max_col=8):
+            for cellObj in row:
+                cellObj.border = borde
+                cellObj.fill = relleno
+                cellObj.font = fuente
 
         DocumentoExcel.save(NomExcel)
 
@@ -1124,7 +1139,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
     
     DF_Resumen.to_excel(PDConsolidado, sheet_name="Resumen", index=False, header=True) #Consolidado
 
-    PDConsolidado.save()
+    PDConsolidado.close()
 
 #Cierra la conexión a la BD
 engine.dispose()
