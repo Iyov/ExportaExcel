@@ -1,8 +1,7 @@
-#from turtle import width
 import pandas
 import sqlalchemy
 import openpyxl
-from openpyxl.styles import Border, Side, PatternFill, Font, colors
+from openpyxl.styles import Border, Side, PatternFill, Font, colors, PatternFill, Alignment
 import xlwings as xw
 import os
 import pyodbc
@@ -51,7 +50,7 @@ print( f"""Reliquidación de '{AbrevCliente}' desde {str(Desde)} al {str(Hasta)}
 
 #region Obtiene las Agrupaciones y los Contratos para recorrer
 #Son 30, es un SP => son 27 con datos, filtrar Ids 12, 19, 20
-ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion IN (1)', engine) #NOT IN (12, 19, 20) IN (4, 6, 16, 24, 26, 27, 5, 28)
+ListaDeAgrup = pandas.read_sql('SELECT IdAgrupacion, NomAgrupacion FROM dbo.Agrupacion WHERE IdAgrupacion NOT IN (12, 19, 20)', engine) #NOT IN (12, 19, 20) IN (4, 6, 16, 24, 26, 27, 5, 28)
 
 #Son 8: Caren BS1 A, B, C, BS3; Norvind BS4; San Juan BS2A, 2C y 3
 ListaGxBloques = pandas.read_sql("SELECT * FROM dbo.CNE_GxBloque WHERE IdCliente = '" + AbrevCliente + "'", engine) # AND GX = ''
@@ -79,6 +78,18 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
     PDConsolidado = pandas.ExcelWriter(ExcelConsolidado, engine='xlsxwriter', date_format='d/m/yyyy')
     DF_Resumen = pandas.DataFrame()
     DF_Resumen.to_excel(PDConsolidado, sheet_name="Resumen", index=False, header=True) #Consolidado
+
+    # Estilo de Bordes
+    borde = Border( left=Side(border_style='thin', color='393939'),
+                    right=Side(border_style='thin', color='393939'),
+                    top=Side(border_style='thin', color='393939'),
+                    bottom=Side(border_style='thin', color='393939'))
+    
+    # Estilo de background verde
+    relleno = PatternFill(start_color='9BBB59', end_color='9BBB59', fill_type='solid')
+    
+    # Crea una fuente en negrita y tamaño 11
+    fuente = Font(bold=True, color='FFFFFF', size=11)
     #endregion
 
     for j, GxBloque in ListaGxBloques.iterrows():
@@ -855,22 +866,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
         DocumentoExcel = openpyxl.load_workbook(NomExcel, data_only=True)
         print( "Archivo", NomExcel, "cargado..." )
-
-        # Creamos un objeto de estilo para la celda
-        borde = Border( left=Side(border_style='thin', color='393939'),
-                        right=Side(border_style='thin', color='393939'),
-                        top=Side(border_style='thin', color='393939'),
-                        bottom=Side(border_style='thin', color='393939'))
         
-        # Creamos un objeto de estilo para el relleno de la celda
-        relleno = PatternFill(  start_color='9BBB59',
-                                end_color='9BBB59',
-                                fill_type='solid')
-        
-        # Crea una fuente en negrita y tamaño 12
-        fuente = Font(bold=True, color='FFFFFF', size=11)
-        
-        #**********     HOJA "Reliquidacion EFACT" **********#
+        #region **********     HOJA "Reliquidacion EFACT" **********
         ReliquidacionEFACT = DocumentoExcel["ReliquidacionEFACT"]
 
         # itera sobre la fila y establece el ancho automático
@@ -883,7 +880,6 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 cellObj.font = fuente
         
         for i, rowOfCellObjects in enumerate(ReliquidacionEFACT['A1':'AE1']):
-            #ReliquidacionEFACT.column_dimensions[i].width = 20
             for n, cellObj in enumerate(rowOfCellObjects):
                 cellObj.value = f""""""
         
@@ -936,8 +932,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 cellObj.value = Valor
                 cellObj.number_format = '#,##0.0'
                 cellObj.font = openpyxl.styles.Font(bold=True)
+        #endregion
         
-        # #**********     HOJA "Reliquidacion CEN" **********#
+        #region **********     HOJA "Reliquidacion CEN" **********
         # if( IdCliente == 1 ):
         #         ReliquidacionCEN = DocumentoExcel["ReliquidacionCEN"]
         #         for i, rowOfCellObjects in enumerate(ReliquidacionCEN['A1':'AE1']):
@@ -987,10 +984,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         #             for n, cellObj in enumerate(rowOfCellObjects):
         #                 Valor = f"""={cellObj.value}"""
         #                 cellObj.value = Valor
-        
+        #endregion
 
-
-        #**********     HOJA "ResumenRetiros" **********#
+        #region **********     HOJA "ResumenRetiros" **********
         ResumenRetiros = DocumentoExcel["ResumenRetiros"]
         for i, rowOfCellObjects in enumerate(ResumenRetiros['A1':'AE1']):
             for n, cellObj in enumerate(rowOfCellObjects):
@@ -1025,11 +1021,11 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 cellObj.font = fuente
 
         DocumentoExcel.save(NomExcel)
+        #endregion
 
         #endregion
 
         #region Lee los totales de Reliquidaciones y los guarda en tablas resumen
-
         wbxl = xw.Book(NomExcel)
         app = xw.apps.active
         Hoja_EFACT = wbxl.sheets['ReliquidacionEFACT']
@@ -1099,8 +1095,8 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
 
         DF_GxBq['Fecha'] = pandas.to_datetime(DF_GxBq["Fecha"].dt.strftime('%m/%d/%Y'))
 
-        # print(DF_GxBq.columns)
-        # print(DF_GxBq.head())
+        #print(DF_GxBq.columns)
+        #print(DF_GxBq.head())
 
         DF_GxBq.to_excel(PDConsolidado, sheet_name=NomHoja, index=False, header=True) #Consolidado
 
@@ -1133,13 +1129,58 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
             conn3.commit()
             cursor3.close()
             conn3.close()
-        
+
         #endregion
-        
     
     DF_Resumen.to_excel(PDConsolidado, sheet_name="Resumen", index=False, header=True) #Consolidado
 
     PDConsolidado.close()
+
+    #region Agrega estilos al Excel Resumen
+    ExcelResumen = openpyxl.load_workbook(ExcelConsolidado, data_only=True)
+
+    # Agrega estilo de título en Hoja Resumen
+    HojaResumen = ExcelResumen["Resumen"]
+    HojaResumen['A8'] = 'Total'
+
+    for row in HojaResumen.iter_rows(min_row=1, max_row=1):
+        for cellObj in row:
+            HojaResumen.column_dimensions[cellObj.column_letter].width = 20 #'auto'
+            cellObj.border = borde
+            cellObj.fill = relleno
+            cellObj.font = fuente
+
+    #Establece separación por miles y sin decimales
+    for i, rowOfCellObjects in enumerate(HojaResumen['B2':'I8']):
+        for n, cellObj in enumerate(rowOfCellObjects):
+            cellObj.number_format = '$#,##0'
+    #Pone en negrita los totales
+    for i, rowOfCellObjects in enumerate(HojaResumen['A8':'I8']):
+        for n, cellObj in enumerate(rowOfCellObjects):
+            cellObj.font = openpyxl.styles.Font(bold=True)
+    
+    for j, GxBloque in ListaGxBloques.iterrows():
+        Bloque = GxBloque["Bloque"]
+        GX_CEN = GxBloque["GX_CEN"]
+        NomHoja = GX_CEN + "_" + Bloque
+        
+        # Agrega estilo de título en Hoja Resumen por Bloque
+        HojaResumenBloque = ExcelResumen[NomHoja]
+        for row in HojaResumenBloque.iter_rows(min_row=1, max_row=1):
+            for cellObj in row:
+                HojaResumenBloque.column_dimensions[cellObj.column_letter].width = 20 #'auto'
+                cellObj.border = borde
+                cellObj.fill = relleno
+                cellObj.font = fuente
+        
+        #Establece separación por miles, sin decimales y negrita
+        for i, rowOfCellObjects in enumerate(HojaResumenBloque['M2':'M7']):
+            for n, cellObj in enumerate(rowOfCellObjects):
+                cellObj.number_format = '$#,##0'
+                cellObj.font = openpyxl.styles.Font(bold=True)
+
+    ExcelResumen.save(ExcelConsolidado)
+    #endregion
 
 #Cierra la conexión a la BD
 engine.dispose()
