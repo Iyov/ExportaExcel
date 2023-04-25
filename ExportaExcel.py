@@ -388,6 +388,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         #endregion
 
         #region Facturacion de SIGGE
+        
         QuerySigge = f"""
             SELECT  CONVERT(VARCHAR(100), f.Periodo, 105) AS Periodo,
                     CONVERT(VARCHAR(100), f.MesDevengado, 105) AS MesDevengado,
@@ -402,7 +403,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     f.Comprador,
                     f.Bloque,
                     f.Empresa,
-                    f.ClaveEEDD,
+                    f.NombreComprador,
                     f.Licitacion,
                     a.NomAgrupacion,
                             f.Num,
@@ -424,7 +425,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                         ELSE NULL
                     END MontoPotencia,
                     f.Precio
-            FROM    dbo.{AbrevCliente}_SIGGE_Fact3 f
+            FROM    dbo.{AbrevCliente}_Facturacion2022 f
                     --LEFT JOIN dbo.{AbrevCliente}_AgrupacionSIGGE asi ON f.Nombre = asi.CodigoContrato
                     LEFT JOIN dbo.Agrupacion a ON f.IdAgrupacion = a.IdAgrupacion
                     --LEFT JOIN dbo.{AbrevCliente}_MesDevengado m ON f.Glosa = m.Glosa
@@ -453,7 +454,7 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                     f.Comprador,
                     f.Bloque,
                     f.Empresa,
-                    f.ClaveEEDD,
+                    f.NombreComprador,
                     f.Licitacion,
                     a.NomAgrupacion
             ORDER BY f.Periodo,
@@ -818,10 +819,10 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
                 print( QueryReal.replace("|Agrupador|", Agrupador) )
             
             Agrupador = "'VENTA PPA ENERGIA'"
-            FactReal_E = pandas.read_sql(QueryReal.replace("|Agrupador|", Agrupador), engine)
+            #FactReal_E = pandas.read_sql(QueryReal.replace("|Agrupador|", Agrupador), engine)
 
             Agrupador = "'VENTA PPA POTENCIA'"
-            FactReal_P = pandas.read_sql(QueryReal.replace("|Agrupador|", Agrupador), engine)
+            #FactReal_P = pandas.read_sql(QueryReal.replace("|Agrupador|", Agrupador), engine)
             #endregion
 
         #endregion
@@ -836,9 +837,9 @@ for i, Agrupacion in ListaDeAgrup.iterrows():
         #     TemplateRC.to_excel(writer, sheet_name='ReliquidacionCEN', index=False)
         TemplateRT.to_excel(writer, sheet_name='ResumenRetiros', index=False)
         
-        if( IdCliente == 1 ):
-            FactReal_E.to_excel(writer, sheet_name='FactRealE', index=False)
-            FactReal_P.to_excel(writer, sheet_name='FactRealP', index=False)
+        #if( IdCliente == 1 ):
+        #    FactReal_E.to_excel(writer, sheet_name='FactRealE', index=False)
+        #    FactReal_P.to_excel(writer, sheet_name='FactRealP', index=False)
         SiggeFact.to_excel(writer, sheet_name='FACT_EMITIDA', index=False)
         SiggeFactE.to_excel(writer, sheet_name='SIGGE_E', index=False)
         SiggeFactP.to_excel(writer, sheet_name='SIGGE_P', index=False)
