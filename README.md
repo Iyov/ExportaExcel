@@ -1,17 +1,6 @@
 # ExportaExcel
 Proyecto de Exportación a Excel para generar el detalle de la Reliquidación
 
-## Librerías a instalar
-```
-pip install pandas
-pip install sqlalchemy
-python -m pip install --upgrade 'sqlalchemy<2.0'
-pip install openpyxl
-pip install xlwings
-pip install pyodbc
-pip install xlsxwriter
-```
-
 ## Descripción
 Se genera un archivo Excel por cada Licitación, Empresa Generadora, Bloque Suministro, Empresa Distribuidora
 
@@ -23,6 +12,17 @@ Lic2013-03_2 EmpresaGx3 BS3 12-EmpresaDx.xlsx
 Lic2013-03_2 EmpresaGx4 BS4 26-EmpresaDx.xlsx
 ```
 
+## Librerías a instalar
+```
+pip install pandas
+pip install sqlalchemy
+python -m pip install --upgrade 'sqlalchemy<2.0'
+pip install openpyxl
+pip install xlwings
+pip install pyodbc
+pip install xlsxwriter
+```
+
 ### Configuración de Conexión a Base de Datos
 Se debe generar un archivo ```database.ini``` con la Conexión a Base de Datos, en el contenido se debe escribir lo siguiente:
 
@@ -32,5 +32,10 @@ server=SERVIDOR
 database=BASE_DE_DATOS
 uid=USER_NAME_SQL
 pwd=PASSWORD_SQL
+```
+
+## Para ejecutar
+```
+Python .\ExportaExcel.py
 ```
 
