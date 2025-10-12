@@ -4,7 +4,7 @@ Proyecto de Exportación a Excel para generar el detalle de la Reliquidación
 ## Descripción
 Se genera un archivo Excel por cada Licitación, Empresa Generadora, Bloque Suministro, Empresa Distribuidora
 
-### Ejemplos
+## Ejemplos
 ```
 Lic2013-03_2 EmpresaGx1 BS1A 1-EmpresaDx.xlsx
 Lic2013-03_2 EmpresaGx2 BS2C 7-EmpresaDx.xlsx
@@ -23,7 +23,7 @@ pip install pyodbc
 pip install xlsxwriter
 ```
 
-### Configuración de Conexión a Base de Datos
+## Configuración de Conexión a Base de Datos
 Se debe generar un archivo ```database.ini``` con la Conexión a Base de Datos, en el contenido se debe escribir lo siguiente:
 
 ```
@@ -38,4 +38,3 @@ pwd=PASSWORD_SQL
 ```
 Python .\ExportaExcel.py
 ```
-
