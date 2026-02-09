@@ -27,7 +27,7 @@ params = urllib.parse.quote_plus("DRIVER={SQL Server};"
 engine = sqlalchemy.create_engine("mssql+pyodbc:///?odbc_connect={}".format(params))
 #endregion
 
-Debug = True   #Despliega o no los resultados por consola para revisar
+Debug = False   #Despliega o no los resultados por consola para revisar
 
 #region Obtiene los Datos del Cliente dado su ID
 IdCliente = 1
