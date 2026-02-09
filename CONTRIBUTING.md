@@ -88,7 +88,7 @@ Tu Pull Request será revisado por un maintainer. Espera:
 
 ```bash
 # Clonar tu fork
-git clone https://github.com/tu-usuario/ExportaExcel.git
+git clone https://github.com/FcoBarrientos/ExportaExcel.git
 cd ExportaExcel
 
 # Instalar dependencias

@@ -13,7 +13,7 @@ Si descubres una vulnerabilidad de seguridad, por favor **NO abras un issue púb
 
 ### Cómo Reportar
 
-1. **Email**: Envía un correo a [security@tu-dominio.com] con:
+1. **Email**: Envía un correo a francisco.barrientos@usach.cl con:
    - Descripción detallada de la vulnerabilidad
    - Pasos para reproducir el problema
    - Impacto potencial
@@ -105,4 +105,5 @@ No hay vulnerabilidades conocidas. Si encuentras alguna, repórtala siguiendo el
 
 ---
 
-**Última actualización**: Febrero 2026
+**Última actualización**: Febrero 2026  
+**Contacto de seguridad**: francisco.barrientos@usach.cl

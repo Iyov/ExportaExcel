@@ -19,7 +19,7 @@ Lic2013-03_2 Norvind BS4 28-SAESA.xlsx
 
 ```bash
 # Clonar repositorio
-git clone https://github.com/tu-usuario/ExportaExcel.git
+git clone https://github.com/FcoBarrientos/ExportaExcel.git
 cd ExportaExcel
 
 # Instalar dependencias
@@ -126,6 +126,6 @@ Este proyecto está bajo la Licencia MIT. Ver [LICENSE](LICENSE) para más detal
 
 ## 📞 Soporte
 
-- 🐛 Reportar bugs: [GitHub Issues](https://github.com/tu-usuario/ExportaExcel/issues)
+- 🐛 Reportar bugs: [GitHub Issues](https://github.com/FcoBarrientos/ExportaExcel/issues)
 - 📖 Documentación: Este README
-- ✉️ Contacto: [tu-email@ejemplo.com]
+- ✉️ Contacto: francisco.barrientos@usach.cl
