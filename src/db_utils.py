@@ -5,8 +5,8 @@ import pyodbc
 from typing import Optional, Any, Dict, List
 from contextlib import contextmanager
 from config import configSQLServer
-from logger_config import setup_logger
-from constants import SQL_SERVER_DRIVER
+from src.logger_config import setup_logger
+from src.constants import SQL_SERVER_DRIVER
 
 logger = setup_logger('db_utils')
 

@@ -50,23 +50,33 @@ El script procesará todas las agrupaciones y generará los archivos Excel en el
 
 ## 📁 Estructura del Proyecto
 
-### Archivos principales
+```
+ExportaExcel/
+├── ExportaExcel.py              # ⭐ Script principal
+├── BD.py                        # Funciones de BD
+├── config.py                    # Configuración
+├── GeneraExportacion.py         # Generación de reportes
+├── database.ini                 # Credenciales (no en Git)
+├── Template_LAP.xlsx            # Plantilla LAP
+├── Template_ACC.xlsx            # Plantilla ACC
+├── requirements.txt             # Dependencias
+└── src/                         # 📦 Utilidades opcionales
+    ├── constants.py             # Constantes reutilizables
+    ├── db_utils.py              # Conexiones seguras
+    ├── excel_utils.py           # Funciones de Excel
+    ├── logger_config.py         # Sistema de logs
+    ├── validators.py            # Validación de datos
+    └── check_setup.py           # Verificación de setup
+```
+
+### Archivos principales (raíz)
 - **ExportaExcel.py** - Script principal de ejecución
 - **BD.py** - Funciones de consultas a base de datos
 - **config.py** - Configuración de conexión
 - **GeneraExportacion.py** - Generación de reportes
 
-### Archivos de utilidades (opcionales)
-- **constants.py** - Constantes reutilizables (evita repetir valores)
-- **db_utils.py** - Conexiones seguras a BD (previene SQL injection)
-- **excel_utils.py** - Funciones de formato Excel
-- **logger_config.py** - Sistema de logs (útil para debugging)
-- **validators.py** - Validación de datos
-- **check_setup.py** - Verificación de instalación
-
-### Templates
-- **Template_LAP.xlsx** - Plantilla para cliente LAP
-- **Template_ACC.xlsx** - Plantilla para cliente ACC
+### Carpeta `src/` (utilidades opcionales)
+Contiene código nuevo que agrega funcionalidades extras pero **no es obligatorio usar**
 
 ## 🔧 Requisitos
 
@@ -77,20 +87,22 @@ El script procesará todas las agrupaciones y generará los archivos Excel en el
 
 ## 📝 Notas
 
-### ¿Para qué sirven los archivos de utilidades?
+### ¿Para qué sirve la carpeta `src/`?
 
-Los archivos nuevos (`constants.py`, `db_utils.py`, etc.) agregan:
-- ✅ Seguridad (prevención de SQL injection)
-- ✅ Logs para debugging
-- ✅ Validación de datos
-- ✅ Código más mantenible
+Los archivos en `src/` agregan funcionalidades extras:
+- ✅ **constants.py** - Evita repetir valores en el código
+- ✅ **db_utils.py** - Conexiones seguras (previene SQL injection)
+- ✅ **excel_utils.py** - Funciones reutilizables de Excel
+- ✅ **logger_config.py** - Logs para debugging
+- ✅ **validators.py** - Validación de datos
+- ✅ **check_setup.py** - Verifica instalación
 
 **¿Los necesitas?** Solo si:
 - Varias personas usan el código
 - Necesitas debugging avanzado
 - Te preocupa la seguridad
 
-**Si solo tú lo usas internamente**, el código original (`ExportaExcel.py`, `BD.py`, `config.py`) es suficiente.
+**Si solo tú lo usas internamente**, los archivos en la raíz (`ExportaExcel.py`, `BD.py`, `config.py`) son suficientes.
 
 ## 🤝 Contribuir
 

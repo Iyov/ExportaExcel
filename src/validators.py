@@ -4,7 +4,7 @@ Validadores para datos y configuraciones.
 import pandas
 from pathlib import Path
 from typing import Optional, List
-from logger_config import setup_logger
+from src.logger_config import setup_logger
 
 logger = setup_logger('validators')
 
